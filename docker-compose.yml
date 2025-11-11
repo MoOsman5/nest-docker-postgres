@@ -1,41 +1,36 @@
-version: "3.5"
+version: '3.8'
 
 services:
-  db:
+  primary-db:
     image: postgres:14
+    container_name: primary-db
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: nestdb
-    container_name: postgres
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      POSTGRES_DB: abs
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
     ports:
       - "5432:5432"
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: nest-docker-postgres
-    env_file:
-      - .env
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
     volumes:
-      - ./src:/app/src
+      - ./primary-db-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    command: >
+      postgres 
+      -c wal_level=replica 
+      -c max_wal_senders=10 
+      -c max_replication_slots=10 
+      -c hot_standby=on
 
-  pgadmin:
-    image: dpage/pgadmin4
+  replica-db:
+    image: postgres:14
+    container_name: replica-db
     restart: always
-    container_name: nest-pgadmin4
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: pgadmin4
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "4055:80"
+      - "6000:5432"
     depends_on:
-      - db
+      - primary-db
+    volumes:
+      - ./replica-db-data:/var/lib/postgresql/data
